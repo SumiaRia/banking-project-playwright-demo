@@ -1,0 +1,24 @@
+{
+  "name": "banking_project_demo",
+  "version": "1.0.0",
+  "description": "End-to-End banking project, build with playwright",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test --project=chromium",
+    "test:all": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --project=chromium --headed",
+    "test:debug": "playwright test --project=chromium --debug",
+    "report": "playwright show-report",
+    "codegen": "playwright codegen https://www.globalsqa.com/angularJs-protractor/BankingProject/#/login",
+    "format": "prettier --write ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.1.2"
+  }
+}
