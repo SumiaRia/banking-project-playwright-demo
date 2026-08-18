@@ -19,7 +19,7 @@ The project is built module by module. Each module lands working code in the rep
 | 0 | Setup & scaffolding | Test runner, browser binaries, config anatomy | `playwright.config.js`, green sample run | ✅ Done |
 | 1 | First real test | Locators, web-first assertions, auto-waiting, strict mode, codegen, trace viewer | `tests/login.spec.js` | ✅ Done |
 | 2 | Real user flows | Forms, `selectOption`, native dialogs, tables, `test.step` | Manager: add customer, open account | ✅ Done |
-| 3 | Page Object Model | Encapsulation, locator reuse, why raw specs rot | `pages/` layer | ⬜ Next |
+| 3 | Page Object Model | Encapsulation, locator reuse, why raw specs rot | `pages/` layer | 🔄 In progress — `LoginPage` done and `tests/login.spec.js` refactored; manager screens next |
 | 4 | Fixtures & test data | Custom fixtures, unique data generators, setup/teardown, test isolation | `fixtures/`, `data/` | ⬜ |
 | 5 | Config in depth | Projects, retries, traces, parallelism, `baseURL`, tags, sharding | Hardened `playwright.config.js` | ⬜ |
 | 6 | Reporting & CI | HTML/JUnit reporters, GitHub Actions, artifacts, flake triage | Working `.github/workflows/` run | ⬜ |
@@ -50,6 +50,7 @@ XYZ Bank, an AngularJS demo app: `https://www.globalsqa.com/angularJs-protractor
 - Manager forms trigger native `alert()` dialogs on submit. Register `page.on('dialog', ...)` **before** the click that triggers them.
 - **There is no server.** All state lives in an in-memory AngularJS service and resets on every page load. See the test data policy below.
 - The **Delete** button in the Customers table fires **no dialog** — deletion is immediate. Only Add Customer and Open Account raise `alert()`.
+- Once the Add Customer form is open, **two buttons read "Add Customer"** — the tab and the form's submit. The names are identical, so `exact: true` does not help. Scope the submit to the form (`page.locator('form').getByRole('button', …)`) and the tab to the tab bar.
 
 ## Test data policy
 
@@ -80,6 +81,19 @@ Prefer `await expect(locator)` assertions over `expect(await locator.textContent
 
 An assertion that something is **absent** (`toBeHidden`, `toHaveCount(0)`) also passes when the element does not exist — including when the page has not navigated yet. Always precede it with a positive assertion proving you are on the right screen.
 
+The positive assertion is also what absorbs a slow app. Under parallel load this demo site has taken **over five seconds** to route after a click; a checkpoint asserting something that was already true on the previous screen waits for nothing and the next line fails. Assert on an element that exists *only* on the destination.
+
+### Page Object Model conventions
+
+- **One class per screen the user perceives, not per URL.** All three manager tabs live at `#/manager` but are separate screens, so they get separate classes (`ManagerPage` for the tab bar, then `AddCustomerPage`, `OpenAccountPage`, `CustomersPage`).
+- File `pages/<screen>.page.js`, class `<Screen>Page`. Plain JS with JSDoc type hints.
+- **Build locators in the constructor, never inside methods.** A `Locator` is a lazy description, not a DOM lookup, so it is safe to create one for an element that does not exist yet. Never `await` in a constructor.
+- **No assertions in page objects.** They expose locators; specs assert on them. Page objects may return data (e.g. alert text) for a spec to assert on.
+- Methods are named in the user's language (`loginAsCustomer(name)`, `addCustomer(customer)`), not the DOM's.
+- **Prefer scoping over `.first()`.** Build locators from other locators (`this.form.getByPlaceholder('First Name')`) so they describe structure rather than position. Reach for `.first()` only when names are genuinely identical and no container distinguishes them.
+- App-specific locator traps (`exact: true` on "Login", the "Add Customer" collision below) belong **inside** the page object, so no future spec can get them wrong.
+- Page objects should not attach page-wide event listeners (`page.on('dialog', ...)`). Dialog handling stays in specs until Module 4 gives it a fixture.
+
 ## Commands
 
 ```bash
@@ -106,4 +120,28 @@ All three browser projects stay defined in `playwright.config.js`; local speed c
 
 ## Repo state
 
-This is **not a git repository yet** — `git init` has not been run, though `.gitignore` and `.github/workflows/playwright.yml` are already in place. Do not assume git commands will work.
+Git repository since 2026-08-07. Remote `origin` is GitHub over **SSH**:
+
+```
+git@github.com:SumiaRia/banking-project-playwright-demo.git
+```
+
+Two branches, both with upstreams configured:
+
+| Branch | Role |
+|---|---|
+| `main` | Known-good code. Only ever receives merges from `dev` — do not commit to it directly. |
+| `dev` | Where module work lands. This is the default working branch. |
+
+At the end of each finished module, promote `dev` to `main`:
+
+```bash
+git switch main
+git merge dev
+git push
+git switch dev
+```
+
+Because the remote is SSH, use `git@github.com:` URLs, not `https://`. `gh` is configured with `git_protocol ssh`.
+
+`.gitignore` covers `node_modules/`, Playwright output dirs, `.DS_Store`, `CLAUDE.local.md` and `.claude/settings.local.json`. `.claude/skills/` and `CLAUDE.md` itself are committed deliberately — they are project tooling.
